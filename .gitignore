@@ -1,0 +1,14 @@
+# Exclude all node modules
+node_modules
+
+# Exclude vs code settings
+.vscode
+
+# Exclude all static content
+website
+public
+
+# Exclude dump files 
+dump.html
+dump.js
+game struct.txt
