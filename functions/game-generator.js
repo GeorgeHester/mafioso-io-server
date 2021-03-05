@@ -1,6 +1,11 @@
+/*
+    Imported module(s)
+*/
 const { v4: uuidv4 } = require('uuid');
 
-// Generates new game data from message
+/*
+    Function to generate new game data
+*/
 const generateNewGame = (clientId) => {
 
     // Generates new game object
@@ -34,6 +39,9 @@ const generateNewGame = (clientId) => {
     };
 };
 
+/*
+    Module export(s)
+*/
 module.exports = {
     generateNewGame: generateNewGame
 };

@@ -13,10 +13,14 @@ const httpServer = http.createServer();
 /*
     Imported Handler(s)
 */
-const gameHandler = require('./functions/game-handler');
+const personTypeProcessor = require('./functions/game-handler/process-person-type');
+const gameNightProcessor = require('./functions/game-handler/process-game-night');
+const gameNightChecker = require('./functions/game-handler/checker-night-complete');
+const gameDayChecker = require('./functions/game-handler/checker-day-complete');
 const gamesHandler = require('./functions/games-handler');
 const clientsHandler = require('./functions/clients-handler');
 const connectionsHandler = require('./functions/connections-handler');
+const gameDefaults = require('./functions/game-defaults');
 
 /*
     Imported Generator(s)
@@ -38,7 +42,7 @@ const requestValidator = require('./functions/validate-handler');
     Open http server on default port
 */
 httpServer.listen(serverPort, () => {
-    console.log(`[ Http Server ][ Listening On Port: ${serverPort} ]`)
+    console.log(`[ Http Server ][ Listening ][ Port: ${serverPort} ]`)
 });
 
 /*
@@ -62,17 +66,20 @@ wsServer.on('request', (request) => {
         Open event
         UNUSED
     */
-    connection.on('open', () => {
+    /*connection.on('open', () => {
 
         console.log('[ Open ]');
-    });
+        //console.log(`[ Socket Open ][ Address: ${connection.socket.remoteAddress}:${connection.socket.remotePort} ]`);
+        console.log(connection.socket.localAddress);
+        console.log(connection.socket.localPort);
+    });*/
 
     /*
         Socket closeure event
     */
     connection.on('close', (event) => {
 
-        console.log('[ close ]');
+        console.log(`[ Client Disconnected ][ ${connection.socket.remoteAddress}:${connection.socket.remotePort} ]`);
 
         // Remove connection from connections hashmap
         let connectionAddress = `${connection.socket.remoteAddress}:${connection.socket.remotePort}`;
@@ -87,7 +94,7 @@ wsServer.on('request', (request) => {
         // Trys to parse message into json
         try {
             var jsonMessage = JSON.parse(message.utf8Data);
-            console.log(`[ ${jsonMessage.method} ]`);
+            console.log(`[ Web Socket ][ ${jsonMessage.method} ][ Ip: ${connection.socket.remoteAddress}:${connection.socket.remotePort} ]`);
         } catch (error) {
             console.error(`[ ERROR ][ Message ][ Not Json ]`);
             return;
@@ -95,6 +102,8 @@ wsServer.on('request', (request) => {
 
         /*console.log(`[ Message ]`);
         console.log(jsonMessage);*/
+
+        //console.log(jsonMessage);
 
         /*
             Method for joining websocket
@@ -193,11 +202,13 @@ wsServer.on('request', (request) => {
             // Check that the request is valid
             let valid = requestValidator.checkCreateGameRequest(jsonMessage);
             if (!valid) {
+
                 connection.send(JSON.stringify({
                     "method": "errorMessage",
                     "message": "Cannot create game.",
                     "messagePersistent": true
                 }));
+
                 return;
             };
 
@@ -236,11 +247,13 @@ wsServer.on('request', (request) => {
             // Check that the request is valid
             let valid = requestValidator.checkJoinGameRequest(jsonMessage);
             if (!valid) {
+
                 connection.send(JSON.stringify({
                     "method": "errorMessage",
                     "message": "Cannot join or find game.",
                     "messagePersistent": true
                 }));
+
                 return;
             };
 
@@ -254,8 +267,17 @@ wsServer.on('request', (request) => {
                 // Stores game id in the client object
                 clientsHandler.addClientGameId(jsonMessage.clientId, jsonMessage.gameId);
 
-                // Adds current client to game objcet
-                gamesHandler.addClient(jsonMessage.gameId, jsonMessage.clientId);
+                let game = gamesHandler.games[jsonMessage.gameId];
+
+                if (game.private.cachePlayerData[jsonMessage.clientId]) {
+
+                    // Unchaches client from game objcet
+                    gamesHandler.uncacheClient(jsonMessage.gameId, jsonMessage.clientId);
+                } else {
+
+                    // Adds current client to game objcet
+                    gamesHandler.addClient(jsonMessage.gameId, jsonMessage.clientId);
+                }
             };
 
             // Broadcast game data to all clients
@@ -275,14 +297,14 @@ wsServer.on('request', (request) => {
             if (!valid) { return };
 
             // Update game object data
-            gameHandler.setPersonTypes(jsonMessage.gameId);
+            personTypeProcessor.setPersonTypes(jsonMessage.gameId);
             gamesHandler.games[jsonMessage.gameId].public.status = "inGameNightTime";
-            gamesHandler.games[jsonMessage.gameId].private.gameTimeout = setTimeout(gameHandler.processGameNightTime, 33000, jsonMessage.gameId);
+            gamesHandler.games[jsonMessage.gameId].private.gameTimeout = setTimeout(gameNightProcessor.processGameNight, gameDefaults.gameTimings.nightLength, jsonMessage.gameId);
 
             // Broadcast game data to all clients
             gameBoardcaster.broadcastGameData(jsonMessage.gameId);
-            gameBoardcaster.broadcastCountdown(jsonMessage.gameId, 33000, "inGameNightTime");
-            gameBoardcaster.broadcastFullScreenMessage(jsonMessage.gameId, "default", "Game Started");
+            gameBoardcaster.broadcastCountdown(jsonMessage.gameId, gameDefaults.gameTimings.nightLength, "inGameNightTime");
+            gameBoardcaster.broadcastFullScreenMessage(jsonMessage.gameId, "default", "Game Started", false, gameDefaults.gameTimings.fullScreenMessageLength);
 
             // Skip all other statements
             return;
@@ -326,7 +348,7 @@ wsServer.on('request', (request) => {
             gamesHandler.games[jsonMessage.gameId].private.clientsVotedTarget.push(jsonMessage.clientId);
 
             // Check if night time is complete
-            gameHandler.checkIfNightTimeComplete(jsonMessage.gameId);
+            gameNightChecker.isGameNightComplete(jsonMessage.gameId);
         };
 
         /*
@@ -342,7 +364,7 @@ wsServer.on('request', (request) => {
             gamesHandler.games[jsonMessage.gameId].private.immunisedPlayer = jsonMessage.chosenClientId;
 
             // Check if night time is complete
-            gameHandler.checkIfNightTimeComplete(jsonMessage.gameId);
+            gameNightChecker.isGameNightComplete(jsonMessage.gameId);
         };
 
         /*
@@ -358,7 +380,7 @@ wsServer.on('request', (request) => {
             gamesHandler.games[jsonMessage.gameId].private.revealedPlayer = jsonMessage.chosenClientId;
 
             // Check if night time is complete
-            gameHandler.checkIfNightTimeComplete(jsonMessage.gameId);
+            gameNightChecker.isGameNightComplete(jsonMessage.gameId);
         };
 
         /*
@@ -373,22 +395,22 @@ wsServer.on('request', (request) => {
             // Check that the request is valid
             let valid = requestValidator.checkConfirmKillPlayerRequest(jsonMessage);
             if (valid.error) {
+
                 connection.send(JSON.stringify({
                     "method": "errorMessage",
                     "message": valid.error,
                     "messagePersistent": false
                 }));
+
                 return;
             };
-
-            console.log('test');
 
             // Add chosen client to killed players and client to voted clients
             gamesHandler.games[jsonMessage.gameId].private.killedPlayerVotes.push(jsonMessage.chosenClientId);
             gamesHandler.games[jsonMessage.gameId].private.clientsVotedKill.push(jsonMessage.clientId);
 
             // Check if day time is complete
-            gameHandler.checkIfDayTimeComplete(jsonMessage.gameId);
+            gameDayChecker.isGameDayComplete(jsonMessage.gameId);
         };
 
         /*

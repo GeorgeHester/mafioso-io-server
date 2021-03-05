@@ -1,8 +1,7 @@
 /*
     Imported module(s)
 */
-const clientsHandler = require("./clients-handler");
-const gameBroadcaster = require("./game-broadcaster");
+const clientsHandler = require('./clients-handler');
 
 /*
     Games object
@@ -54,7 +53,6 @@ const removeClient = (gameId, clientId) => {
             if (Object.keys(games[gameId].private.playerData).length > 0) {
 
                 games[gameId].public.hostId = Object.keys(games[gameId].private.playerData)[0];
-                gameBroadcaster.broadcastGameData(gameId);
             } else {
 
                 removeGame(gameId);
@@ -78,7 +76,6 @@ const cacheClient = (gameId, clientId) => {
             if (Object.keys(games[gameId].private.playerData).length > 0) {
 
                 games[gameId].public.hostId = Object.keys(games[gameId].private.playerData)[0];
-                gameBroadcaster.broadcastGameData(gameId);
             } else {
 
                 removeGame(gameId);
@@ -92,17 +89,17 @@ const cacheClient = (gameId, clientId) => {
 */
 const uncacheClient = (gameId, clientId) => {
 
-    if (games[gameId].private.cachePlayerData[clientId]) {
-        games[gameId].private.playerData[clientId] = games[gameId].private.cachePlayerData[clientId];
-        delete games[gameId].private.cachePlayerData[clientId];
-    };
+    if (!games[gameId].private.cachePlayerData[clientId]) { return };
+
+    games[gameId].private.playerData[clientId] = games[gameId].private.cachePlayerData[clientId];
+    delete games[gameId].private.cachePlayerData[clientId];
 };
 
 /*
     Function to get game object
 */
 const getGame = (gameId) => {
-    
+
     if (!games[gameId]) { return };
     return games[gameId];
 };
@@ -137,5 +134,5 @@ module.exports = {
     cacheClient: cacheClient,
     uncacheClient: uncacheClient,
     getGame: getGame,
-    updateGame:updateGame
-}
+    updateGame: updateGame
+};

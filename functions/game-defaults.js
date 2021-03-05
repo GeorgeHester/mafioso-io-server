@@ -1,3 +1,6 @@
+/*
+    Storage for all game personn type ratios
+*/
 const personTypeRatios = {
     1: {
         "personVillager": 1,
@@ -49,6 +52,19 @@ const personTypeRatios = {
     }
 };
 
+/*
+    Storage for all game timeouts
+*/
+const gameTimings = {
+    dayLength: 33000,
+    nightLength: 33000,
+    fullScreenMessageLength: 3000
+};
+
+/*
+    Module export(s)
+*/
 module.exports = {
-    personTypeRatios: personTypeRatios
+    personTypeRatios: personTypeRatios,
+    gameTimings: gameTimings
 };

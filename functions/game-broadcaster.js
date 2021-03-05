@@ -3,7 +3,7 @@
 */
 const arrayHandler = require('./array-handler');
 const clientsHandler = require('./clients-handler');
-const gamesHandler = require('./games-handler');
+const gamesHandler = require('../functions/games-handler');
 
 const broadcastGameData = (gameId) => {
 
@@ -230,7 +230,7 @@ const broadcastMessage = (gameId, message) => {
     };
 };
 
-const broadcastFullScreenMessage = (gameId, messageType, message) => {
+const broadcastFullScreenMessage = (gameId, messageType, message, messagePersistent, messageTimeout) => {
 
     let game = gamesHandler.games[gameId];
 
@@ -239,7 +239,9 @@ const broadcastFullScreenMessage = (gameId, messageType, message) => {
         clientsHandler.clients[Object.keys(game.private.playerData)[i]].connection.send(JSON.stringify({
             "method": "fullScreenMessage",
             "message": message,
-            "messageType": messageType
+            "messageType": messageType,
+            "messagePersistent": messagePersistent,
+            "messageTimeout": messageTimeout
         }));
     };
 };

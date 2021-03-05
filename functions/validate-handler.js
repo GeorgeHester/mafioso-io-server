@@ -24,10 +24,8 @@ const checkReconnectClientRequest = (message) => {
     /*
         Checks:
             - Required parameters for request are present.
-            - The client doesn't already exist
     */
     if (!message.clientId || !message.clientName) { return false };
-    //if (clientsHandler.clients[message.clientId]) { return false };
     return true;
 };
 
