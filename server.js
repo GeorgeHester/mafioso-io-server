@@ -4,6 +4,11 @@
 const serverPort = 8080;
 
 /*
+    Import environment variables
+*/
+require('dotenv').config({ path: './.env' });
+
+/*
     Imported module(s)
 */
 const http = require('http');
@@ -63,6 +68,17 @@ wsServer.on('request', (request) => {
     const connection = request.accept(null, request.origin);
 
     /*
+        Get the connection address from the request sent to the web socket
+    */
+    var connectionAddress = null;
+
+    if (process.env.ipMode == 'proxy') {
+        connectionAddress = `${request.httpRequest.headers['x-real-ip']}-${request.httpRequest.headers['x-real-port']}`;
+    } else {
+        connectionAddress = `${request.socket.remoteAddress}-${request.socket.remotePort}`;
+    };
+
+    /*
         Open event
         UNUSED
     */
@@ -79,10 +95,10 @@ wsServer.on('request', (request) => {
     */
     connection.on('close', (event) => {
 
-        console.log(`[ Client Disconnected ][ ${connection.socket.remoteAddress}:${connection.socket.remotePort} ]`);
+        console.log(`[ Web Socket ][ Disconnect Client ][ Ip: ${connectionAddress} ]`);
 
         // Remove connection from connections hashmap
-        let connectionAddress = `${connection.socket.remoteAddress}:${connection.socket.remotePort}`;
+        //let connectionAddress = `${connection.socket.remoteAddress}:${connection.socket.remotePort}`;
         //connectionsHandler.removeConnection(connectionAddress);
     });
 
@@ -91,35 +107,35 @@ wsServer.on('request', (request) => {
     */
     connection.on('message', (message) => {
 
-        // Trys to parse message into json
+        /*
+            Trys to parse message into json
+        */
         try {
+
+            // Get message data and try to parse it to json object
             var jsonMessage = JSON.parse(message.utf8Data);
-            console.log(`[ Web Socket ][ ${jsonMessage.method} ][ Ip: ${connection.socket.remoteAddress}:${connection.socket.remotePort} ]`);
         } catch (error) {
-            console.error(`[ ERROR ][ Message ][ Not Json ]`);
+
+            // Log out error data and skip all other code
+            console.error(`[ ERROR ][ Web Socket ][ Message ][ Error: Not Json ]`);
             return;
         };
-
-        /*console.log(`[ Message ]`);
-        console.log(jsonMessage);*/
-
-        //console.log(jsonMessage);
 
         /*
             Method for joining websocket
         */
         if (jsonMessage.method === 'connectClient') {
 
-            // Check that the request is valid
+            // Check that the request is valid and log the request
             let valid = requestValidator.checkConnectClientRequest(jsonMessage);
+            console.log(`[ Web Socket ][ Connect Client ][ Ip: ${connectionAddress} ][ ${valid ? 'Valid' : 'Invalid'} ]`);
             if (!valid) { return };
 
-            // Generates new client data and stores in hashmap of clients
+            // Generates new client data and stores it in hashmap of clients
             let client = clientGenerator.generateNewClient(jsonMessage.clientName);
             clientsHandler.addClient(client.clientId, connection, client.clientSecret, client.clientName);
 
-            // Generates new connection and stores in hashmap of connections
-            let connectionAddress = `${connection.socket.remoteAddress}:${connection.socket.remotePort}`;
+            // Store connection address in hashmap of connections
             connectionsHandler.addConnection(connectionAddress, client.clientId);
 
             // Send client data back to client
@@ -138,10 +154,12 @@ wsServer.on('request', (request) => {
         */
         if (jsonMessage.method === 'reconnectClient') {
 
-            // Check that the request is valid
+            // Check that the request is valid and log the request
             let valid = requestValidator.checkReconnectClientRequest(jsonMessage);
+            console.log(`[ Web Socket ][ Reconnect Client ][ Ip: ${connectionAddress} ][ ${valid ? 'Valid' : 'Invalid'} ]`);
             if (!valid) { return };
 
+            // Set default data
             let clientId = null;
             let clientSecret = null;
 
@@ -151,6 +169,7 @@ wsServer.on('request', (request) => {
                 let generatedClientSecret = clientGenerator.generateNewClientSecret();
                 clientsHandler.addClient(jsonMessage.clientId, connection, generatedClientSecret, jsonMessage.clientName);
 
+                // Store data
                 clientId = jsonMessage.clientId;
                 clientSecret = generatedClientSecret;
             } else {
@@ -159,12 +178,12 @@ wsServer.on('request', (request) => {
                 let client = clientGenerator.generateNewClient(jsonMessage.clientName);
                 clientsHandler.addClient(client.clientId, connection, client.clientSecret, client.clientName);
 
+                // Store data
                 clientId = client.clientId;
                 clientSecret = client.clientSecret;
             };
 
-            // Generates new connection and stores in hashmap of connections
-            let connectionAddress = `${connection.socket.remoteAddress}:${connection.socket.remotePort}`;
+            // Store connection address in hashmap of connections
             connectionsHandler.addConnection(connectionAddress, clientId);
 
             // Send client data back to client
@@ -183,8 +202,9 @@ wsServer.on('request', (request) => {
         */
         if (jsonMessage.method === 'updateClientName') {
 
-            // Check that the request is valid
+            // Check that the request is valid and log the request
             let valid = requestValidator.checkUpdateClientNameRequest(jsonMessage);
+            console.log(`[ Web Socket ][ Update Client Name ][ Ip: ${connectionAddress} ][ ${valid ? 'Valid' : 'Invalid'} ]`);
             if (!valid) { return };
 
             // Update client name on clients
@@ -199,21 +219,24 @@ wsServer.on('request', (request) => {
         */
         if (jsonMessage.method === 'createGame') {
 
-            // Check that the request is valid
+            // Check that the request is valid and log the request
             let valid = requestValidator.checkCreateGameRequest(jsonMessage);
+            console.log(`[ Web Socket ][ Create Game ][ Ip: ${connectionAddress} ][ ClientId: ${jsonMessage.clientId} ][ ${valid ? 'Valid' : 'Invalid'} ]`);
             if (!valid) {
 
+                // Return error response to client
                 connection.send(JSON.stringify({
                     "method": "errorMessage",
                     "message": "Cannot create game.",
                     "messagePersistent": true
                 }));
-
                 return;
             };
 
             // Check the client isn't already in a game, if they are remove client from previous game
             if (clientsHandler.clients[jsonMessage.clientId].gameId != null) {
+
+                // Remove client from game
                 gamesHandler.removeClient(clientsHandler.clients[jsonMessage.clientId].gameId, jsonMessage.clientId);
             };
 
@@ -244,16 +267,17 @@ wsServer.on('request', (request) => {
         */
         if (jsonMessage.method === 'joinGame') {
 
-            // Check that the request is valid
+            // Check that the request is valid and log the request
             let valid = requestValidator.checkJoinGameRequest(jsonMessage);
+            console.log(`[ Web Socket ][ Join Game ][ Ip: ${connectionAddress} ][ ClientId: ${jsonMessage.clientId} ][ GameId: ${jsonMessage.gameId} ][ ${valid ? 'Valid' : 'Invalid'} ]`);
             if (!valid) {
 
+                // Return error response to client
                 connection.send(JSON.stringify({
                     "method": "errorMessage",
                     "message": "Cannot join or find game.",
                     "messagePersistent": true
                 }));
-
                 return;
             };
 
@@ -261,12 +285,15 @@ wsServer.on('request', (request) => {
 
                 // Check the client isn't already in a game, if they are remove client from previous game
                 if (clientsHandler.clients[jsonMessage.clientId].gameId != null) {
+
+                    // Remove client from game
                     gamesHandler.removeClient(clientsHandler.clients[jsonMessage.clientId].gameId, jsonMessage.clientId);
                 };
 
                 // Stores game id in the client object
                 clientsHandler.addClientGameId(jsonMessage.clientId, jsonMessage.gameId);
 
+                // Get the game object
                 let game = gamesHandler.games[jsonMessage.gameId];
 
                 if (game.private.cachePlayerData[jsonMessage.clientId]) {
@@ -277,7 +304,7 @@ wsServer.on('request', (request) => {
 
                     // Adds current client to game objcet
                     gamesHandler.addClient(jsonMessage.gameId, jsonMessage.clientId);
-                }
+                };
             };
 
             // Broadcast game data to all clients

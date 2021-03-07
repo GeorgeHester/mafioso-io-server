@@ -14,6 +14,12 @@ const personTypeRatios = {
         "personDoctor": 0,
         "personDetective": 0
     },
+    4: {
+        "personVillager": 1,
+        "personMafia": 1,
+        "personDoctor": 1,
+        "personDetective": 1
+    },
     5: {
         "personVillager": 2,
         "personMafia": 1,
